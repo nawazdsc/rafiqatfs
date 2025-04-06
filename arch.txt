@@ -1,0 +1,84 @@
+# Step 1: Install required libraries
+!pip install yfinance arch matplotlib seaborn statsmodels
+
+# Step 2: Import required libraries
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from arch import arch_model
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
+%matplotlib inline
+
+# Step 3: Download SPY historical data (5 years)
+data = yf.download("SPY", period="5y")
+close_prices = data['Close']
+
+# Step 4: Calculate returns
+returns = 100 * close_prices.pct_change().dropna()
+
+# Step 5: Plot Historical Volatility
+plt.figure(figsize=(12, 5))
+plt.plot(returns, label='Daily Returns (%)')
+plt.title("Historical Daily Returns (Volatility)")
+plt.xlabel("Date")
+plt.ylabel("Returns (%)")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Step 6: Rolling Mean and Standard Deviation
+rolling_mean = returns.rolling(window=30).mean()
+rolling_std = returns.rolling(window=30).std()
+
+plt.figure(figsize=(12, 5))
+plt.plot(returns, label='Returns')
+plt.plot(rolling_mean, label='30-day Rolling Mean', color='red')
+plt.plot(rolling_std, label='30-day Rolling Std Dev', color='green')
+plt.title("Rolling Mean and Standard Deviation of Returns")
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+# Step 7: Plot ACF and PACF of squared returns
+squared_returns = returns ** 2
+
+fig, ax = plt.subplots(1, 2, figsize=(14, 4))
+plot_acf(squared_returns, lags=30, ax=ax[0])
+plot_pacf(squared_returns, lags=30, ax=ax[1])
+ax[0].set_title("ACF of Squared Returns")
+ax[1].set_title("PACF of Squared Returns")
+plt.tight_layout()
+plt.show()
+
+# Step 8: Fit ARCH(1) Model
+model = arch_model(returns, vol='ARCH', p=1)
+model_fit = model.fit(disp='off')
+print(model_fit.summary())
+
+# Step 9: Plot Conditional Volatility
+plt.figure(figsize=(12, 5))
+plt.plot(model_fit.conditional_volatility, label='Conditional Volatility')
+plt.title("Conditional Volatility from ARCH(1) Model")
+plt.xlabel("Date")
+plt.ylabel("Volatility")
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+# Step 10: Forecast Future Volatility (Next 5 Days)
+forecast = model_fit.forecast(horizon=5)
+print("Forecasted Variance:\n", forecast.variance.iloc[-1])
+
+# Step 11: Plot Forecasted Variance
+plt.figure(figsize=(8, 4))
+plt.plot(forecast.variance.iloc[-1], marker='o')
+plt.title("5-Day Forecasted Variance (ARCH(1))")
+plt.xlabel("Day")
+plt.ylabel("Forecasted Variance")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
