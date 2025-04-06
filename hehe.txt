@@ -1,0 +1,69 @@
+# STEP 1: Import libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.api import VAR
+from statsmodels.tsa.stattools import adfuller
+
+# STEP 2: Load the dataset
+ice_cream_heater_df = pd.read_csv('ice_cream_vs_heater.xls')
+
+# STEP 3: Convert Month to datetime and set as index
+ice_cream_heater_df['Month'] = pd.to_datetime(ice_cream_heater_df['Month'])
+ice_cream_heater_df = ice_cream_heater_df.set_index('Month')
+
+# STEP 4: ADF Test Function
+def adf_test(series):
+    result = adfuller(series)
+    return result[1]  # return p-value
+
+# STEP 5: Check for stationarity
+print("ADF Test p-values (before differencing):")
+print("Heater:", adf_test(ice_cream_heater_df['heater']))
+print("Ice Cream:", adf_test(ice_cream_heater_df['ice cream']))
+
+# STEP 6: Make data stationary using first-order differencing
+df_diff = ice_cream_heater_df.diff().dropna()
+
+# STEP 7: Check stationarity after differencing
+print("\nADF Test p-values (after differencing):")
+print("Heater:", adf_test(df_diff['heater']))
+print("Ice Cream:", adf_test(df_diff['ice cream']))
+
+# STEP 8: Fit the VAR model
+model = VAR(df_diff)
+results = model.fit(maxlags=15, ic='aic')
+print("\nOptimal lag selected:", results.k_ar)
+
+# STEP 9: Forecast the next 5 time steps
+forecast_input = df_diff.values[-results.k_ar:]
+forecast = results.forecast(y=forecast_input, steps=5)
+forecast_df = pd.DataFrame(forecast, columns=df_diff.columns)
+
+# STEP 10: Create future dates
+last_date = ice_cream_heater_df.index[-1]
+forecast_dates = pd.date_range(start=last_date + pd.DateOffset(months=1), periods=5, freq='MS')
+forecast_df.index = forecast_dates
+
+# STEP 11: Inverse transformation to get actual values
+last_observation = ice_cream_heater_df.iloc[-1]
+forecast_original = forecast_df.cumsum() + last_observation
+
+# STEP 12: Plot actual vs forecasted
+plt.figure(figsize=(12, 6))
+
+# Actual
+plt.plot(ice_cream_heater_df['heater'], label='Heater Sales (Actual)', color='orange')
+plt.plot(ice_cream_heater_df['ice cream'], label='Ice Cream Sales (Actual)', color='blue')
+
+# Forecast
+plt.plot(forecast_original['heater'], label='Heater Sales (Forecast)', linestyle='--', color='red')
+plt.plot(forecast_original['ice cream'], label='Ice Cream Sales (Forecast)', linestyle='--', color='green')
+
+plt.title("Actual vs Forecasted Sales")
+plt.xlabel("Month")
+plt.ylabel("Units Sold")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.show()
