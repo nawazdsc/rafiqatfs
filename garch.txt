@@ -1,0 +1,75 @@
+# STEP 1: Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from arch import arch_model
+import yfinance as yf
+import datetime
+
+# STEP 2: Download Apple stock data from Yahoo Finance
+start = datetime.datetime(2010, 1, 1)
+end = datetime.datetime(2023, 12, 31)
+data = yf.download('AAPL', start=start, end=end)
+
+# STEP 3: Calculate daily log returns
+data['Log_Returns'] = np.log(data['Close'] / data['Close'].shift(1))
+
+# STEP 4: Plot the closing prices
+plt.figure(figsize=(10, 4))
+plt.plot(data['Close'])
+plt.title('AAPL Closing Prices')
+plt.xlabel('Date')
+plt.ylabel('Price')
+plt.grid(True)
+plt.show()
+
+# STEP 5: Plot log returns
+data['Log_Returns'].dropna().plot(figsize=(10, 4))
+plt.title('AAPL Log Returns')
+plt.grid(True)
+plt.show()
+
+# STEP 6: Describe log returns
+print("Log Return Stats:\n", data['Log_Returns'].describe())
+
+# STEP 7: Histogram of log returns
+sns.histplot(data['Log_Returns'].dropna(), bins=50, kde=True)
+plt.title('Distribution of Log Returns')
+plt.xlabel('Log Returns')
+plt.grid(True)
+plt.show()
+
+# STEP 8: Fit GARCH(1,1) model
+returns = data['Log_Returns'].dropna() * 100  # scale to percentage
+model = arch_model(returns, vol='Garch', p=1, q=1)
+model_fit = model.fit(disp='off')
+
+# STEP 9: Summary of the model
+print(model_fit.summary())
+
+# STEP 10: Plot conditional volatility
+model_fit.plot()
+plt.show()
+
+# STEP 11: Forecast volatility for the next 5 days
+forecast = model_fit.forecast(horizon=5)
+print("Forecasted Variance (Next 5 Days):")
+print(forecast.variance[-1:])
+
+# STEP 12: Plot the forecasted variance
+plt.plot(forecast.variance.iloc[-1].values)
+plt.title("5-Day Forecasted Volatility")
+plt.xlabel("Days Ahead")
+plt.ylabel("Variance")
+plt.grid(True)
+plt.show()
+
+# STEP 13: Add volatility to original data
+data['Volatility'] = model_fit.conditional_volatility
+
+# STEP 14: Plot log returns and volatility side by side
+data[['Log_Returns', 'Volatility']].dropna().plot(subplots=True, figsize=(10, 6))
+plt.suptitle('Log Returns and Estimated Volatility')
+plt.grid(True)
+plt.show()
